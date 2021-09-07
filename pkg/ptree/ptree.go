@@ -1,59 +1,87 @@
 package ptree
 
+import (
+	"fmt"
+	"nano-gpu-exporter/pkg/util"
+	"strings"
+	"sync"
+	"time"
+	"k8s.io/klog"
+)
+
 // PTree is a common interface to detect the tree such as:
 // node -> pods -> containers -> processes
 
 type PTree interface {
-	Snapshot() (Node, error)
+	Run()
+	InterestPod(UID string, QOS string)
+	ForgetPod(UID string)
+	Snapshot() Node
 }
 
-type Node struct {
-	Pods       map[string]*Pod
-	Containers map[string]*Container
-	Processes  map[int]*Process
+type PTreeImpl struct {
+	interval        time.Duration
+	mu              sync.Mutex
+	interestingPods map[string]string
+	nodeSnapshot    *Node
+	scanner         Scanner
 }
 
-func NewNode() *Node {
-	return &Node{
-		Pods:       make(map[string]*Pod),
-		Containers: make(map[string]*Container),
-		Processes:  make(map[int]*Process),
+func (p *PTreeImpl) Run() {
+	util.Loop(func() {
+		if err := p.nextSnapshot(); err != nil {
+			klog.Error(err.Error())
+		}
+	}, p.interval, util.NeverStop)
+}
+
+func (p *PTreeImpl) InterestPod(UID string, QOS string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.interestingPods[UID] = QOS
+}
+
+func (p *PTreeImpl) ForgetPod(UID string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.interestingPods, UID)
+}
+
+func (p *PTreeImpl) Snapshot() *Node {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.nodeSnapshot
+}
+
+func (p *PTreeImpl) nextSnapshot() error {
+	var (
+		pods     = p.interesting()
+		errors   = []string{}
+		snapshot = NewNode()
+	)
+
+	for UID, QOS := range pods {
+		if pod, err := p.scanner.Scan(UID, QOS); err != nil {
+			errors = append(errors, err.Error())
+		} else {
+			snapshot.AddPod(&pod)
+		}
 	}
-}
-
-func (n *Node) GetProcessByPid(pid int) (p *Process, exist bool) {
-	if process, ok := n.Processes[pid]; ok {
-		return process, true
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.nodeSnapshot = snapshot
+	if len(errors) == 0 {
+		return nil
 	}
-	return nil, false
+	return fmt.Errorf("%d errors: %s", len(errors), strings.Join(errors, "; "))
 }
 
-func (n *Node) AddPod(pod *Pod) {
-
-}
-
-func (n *Node) AddContainer(container *Container) {
-
-}
-
-func (n *Node) AddProcess(process *Process) {
-
-}
-
-type Pod struct {
-	QOS        string
-	UID        string
-	Parent     *Node
-	Containers map[string]*Container
-}
-
-type Container struct {
-	ID        string
-	Parent    *Pod
-	Processes map[int]*Process
-}
-
-type Process struct {
-	Pid    int
-	Parent *Container
+func (p *PTreeImpl) interesting() map[string]string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	pods := map[string]string{}
+	for UID, QOS := range p.interestingPods {
+		pods[UID] = QOS
+	}
+	return pods
 }
