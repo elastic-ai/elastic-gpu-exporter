@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+
 	"k8s.io/klog"
 )
 
@@ -17,6 +18,7 @@ type PTree interface {
 	InterestPod(UID string, QOS string)
 	ForgetPod(UID string)
 	Snapshot() Node
+	LastUpdate() time.Time
 }
 
 type PTreeImpl struct {
@@ -24,6 +26,7 @@ type PTreeImpl struct {
 	mu              sync.Mutex
 	interestingPods map[string]string
 	nodeSnapshot    *Node
+	lastUpdate      time.Time
 	scanner         Scanner
 }
 
@@ -53,6 +56,12 @@ func (p *PTreeImpl) Snapshot() *Node {
 	return p.nodeSnapshot
 }
 
+func (p *PTreeImpl) LastUpdate() time.Time {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastUpdate
+}
+
 func (p *PTreeImpl) nextSnapshot() error {
 	var (
 		pods     = p.interesting()
@@ -64,12 +73,13 @@ func (p *PTreeImpl) nextSnapshot() error {
 		if pod, err := p.scanner.Scan(UID, QOS); err != nil {
 			errors = append(errors, err.Error())
 		} else {
-			snapshot.AddPod(&pod)
+			snapshot.addPod(&pod)
 		}
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.nodeSnapshot = snapshot
+	p.lastUpdate = time.Now()
 	if len(errors) == 0 {
 		return nil
 	}
