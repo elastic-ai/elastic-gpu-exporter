@@ -14,10 +14,10 @@ import (
 // node -> pods -> containers -> processes
 
 type PTree interface {
-	Run()
-	InterestPod(UID string, QOS string)
+	Run(stop <-chan struct{})
+	InterestPod(UID, QOS string)
 	ForgetPod(UID string)
-	Snapshot() Node
+	Snapshot() *Node
 	LastUpdate() time.Time
 }
 
@@ -30,12 +30,23 @@ type PTreeImpl struct {
 	scanner         Scanner
 }
 
-func (p *PTreeImpl) Run() {
+func NewPTree(interval time.Duration) *PTreeImpl {
+	return &PTreeImpl{
+		interval:        interval,
+		mu:              sync.Mutex{},
+		interestingPods: make(map[string]string),
+		nodeSnapshot:    NewNode(),
+		lastUpdate:      time.Now(),
+		scanner:         nil,
+	}
+}
+
+func (p *PTreeImpl) Run(stop <-chan struct{}) {
 	util.Loop(func() {
 		if err := p.nextSnapshot(); err != nil {
 			klog.Error(err.Error())
 		}
-	}, p.interval, util.NeverStop)
+	}, p.interval, stop)
 }
 
 func (p *PTreeImpl) InterestPod(UID string, QOS string) {

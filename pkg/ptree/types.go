@@ -49,8 +49,8 @@ type Pod struct {
 
 func NewPod(QOS, UID string) *Pod {
 	return &Pod{
-		QOS: QOS,
-		UID: UID,
+		QOS:        QOS,
+		UID:        UID,
 		Containers: make(map[string]*Container),
 	}
 }
