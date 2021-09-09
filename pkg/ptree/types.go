@@ -26,6 +26,7 @@ func (n *Node) addPod(pod *Pod) {
 		n.addContainer(c)
 	}
 	n.Pods[pod.UID] = pod
+	pod.Parent = n
 }
 
 func (n *Node) addContainer(container *Container) {
@@ -46,8 +47,21 @@ type Pod struct {
 	Containers map[string]*Container
 }
 
-func (c Container) AddContainer(ID string) *Container {
+func NewPod(QOS, UID string) *Pod {
+	return &Pod{
+		QOS:        QOS,
+		UID:        UID,
+		Containers: make(map[string]*Container),
+	}
+}
 
+func (p *Pod) AddContainer(ID string) *Container {
+	p.Containers[ID] = &Container{
+		ID:        ID,
+		Parent:    p,
+		Processes: make(map[int]*Process),
+	}
+	return p.Containers[ID]
 }
 
 type Container struct {
