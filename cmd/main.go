@@ -16,7 +16,7 @@ var (
 	interval  int
 )
 
-func init() {
+func Init() {
 	flag.StringVar(&node, "node", "", "node name")
 	flag.StringVar(&resources, "labels", Resources, "gpu resources name")
 	flag.IntVar(&interval, "interval", 30, "monitor interval (second)")
@@ -24,6 +24,7 @@ func init() {
 }
 
 func main() {
+	Init()
 	e := exporter.NewExporter(node, strings.Split(resources, ","), time.Duration(interval) * time.Second)
 	e.Run(util.NeverStop)
 }

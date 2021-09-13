@@ -81,3 +81,8 @@ type Process struct {
 	Pid    int
 	Parent *Container
 }
+
+type ProcessUsage struct {
+	GPUCore float64
+	GPUMemo float64
+}
