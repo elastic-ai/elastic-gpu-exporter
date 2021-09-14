@@ -84,7 +84,7 @@ func (p *PTreeImpl) nextSnapshot() error {
 		if pod, err := p.scanner.Scan(UID, QOS); err != nil {
 			errors = append(errors, err.Error())
 		} else {
-			snapshot.addPod(&pod)
+			snapshot.addPod(pod)
 		}
 	}
 	p.mu.Lock()

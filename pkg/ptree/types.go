@@ -47,7 +47,7 @@ type Pod struct {
 	Containers map[string]*Container
 }
 
-func NewPod(QOS, UID string) *Pod {
+func NewPod(UID, Pod string) *Pod {
 	return &Pod{
 		QOS:        QOS,
 		UID:        UID,
