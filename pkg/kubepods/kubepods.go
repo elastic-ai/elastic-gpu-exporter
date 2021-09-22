@@ -2,7 +2,6 @@ package kubepods
 
 import (
 	"flag"
-	"github.com/sirupsen/logrus"
 	v12 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
@@ -55,7 +54,7 @@ func NewWatcher(handler *Handler, gpuLabels []string, node string) Watcher {
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
-		logrus.WithError(err).Fatal("Could not get config")
+		klog.Fatalf("Could not get config")
 	}
 
 	// create the clientset
