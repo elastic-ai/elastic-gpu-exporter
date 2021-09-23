@@ -13,7 +13,7 @@ import (
 const(
 	QOSGuaranteed = "guaranteed"
 	QOSBurstable  = "burstable"
-	QOSBestEffort = "bestEffort"
+	QOSBestEffort = "besteffort"
 	CgroupBase    = "/sys/fs/cgroup/memory"
 	PodPrefix     = "pod"
 	CGROUP_PROCS  = "cgroup.procs"
@@ -33,15 +33,22 @@ type Scanner interface {
 }
 
 type ScannerImpl struct{
-	pod       Pod
-	container Container
+	pod       *Pod
+	container *Container
+}
+
+func NewScanner() Scanner {
+	return &ScannerImpl{
+		pod:          NewP(),
+		container:    NewC(),
+	}
 }
 
 type CgroupName []string
 
 func (scan *ScannerImpl) Scan(UID, QOS string) (Pod, error) {
-	scan.pod.Containers = make(map[string]*Container)
-	scan.container.Processes = make(map[int]*Process)
+	//scan.pod.Containers = make(map[string]*Container)
+	//scan.container.Processes = make(map[int]*Process)
 	pod, err := scan.getContainers(NewPod(QOS, UID))
 	if err != nil {
 		klog.Errorf("Cannot scan pod: pod%s, %v", UID, err)

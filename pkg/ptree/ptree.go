@@ -37,7 +37,7 @@ func NewPTree(interval time.Duration) *PTreeImpl {
 		interestingPods: make(map[string]string),
 		nodeSnapshot:    NewNode(),
 		lastUpdate:      time.Now(),
-		scanner:         nil,
+		scanner:         NewScanner(),
 	}
 }
 
@@ -79,7 +79,6 @@ func (p *PTreeImpl) nextSnapshot() error {
 		errors   = []string{}
 		snapshot = NewNode()
 	)
-
 	for UID, QOS := range pods {
 		if pod, err := p.scanner.Scan(UID, QOS); err != nil {
 			errors = append(errors, err.Error())

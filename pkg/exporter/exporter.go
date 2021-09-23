@@ -7,6 +7,7 @@ import (
 	"nano-gpu-exporter/pkg/nvidia"
 	tree "nano-gpu-exporter/pkg/ptree"
 	"nano-gpu-exporter/pkg/util"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,16 +31,17 @@ type Exporter struct {
 }
 
 func NewExporter(node string, gpuLabels []string, interval time.Duration) *Exporter {
+	collector := metrics.NewCollector()
+	collector.Register()
 	ptree := tree.NewPTree(interval)
 	podCache := NewCache()
 	return &Exporter{
 		node:      node,
 		gpuLabels: gpuLabels,
 		interval:  interval,
-
 		podCache:  podCache,
 		ptree:     ptree,
-		collector: metrics.NewCollector(),
+		collector: collector,
 
 		watcher: kubepods.NewWatcher(&kubepods.Handler{
 			AddFunc: func(pod *v1.Pod) {
@@ -69,12 +71,9 @@ func (e *Exporter) once() {
 	var cardMemUsage0, cardCoreUsage0, cardMemUsage1, cardCoreUsage1 float64
 
 	node := e.ptree.Snapshot()
-
 	for _, pod := range node.Pods{
 		var podCore, podMem float64
-
-		p,_ := e.podCache.GetPod(pod.UID)
-		klog.Info(p.Name)
+		p, _ := e.podCache.GetPod(pod.UID)
 		ns := p.Namespace
 		for _, container := range pod.Containers{
 			var contCore, contMem float64
@@ -100,7 +99,8 @@ func (e *Exporter) once() {
 			podMem += contMem
 			var contName string
 			for _, cont := range p.Status.ContainerStatuses {
-				if cont.ContainerID == container.ID {
+				containerID := strings.Split(cont.ContainerID,"//")
+				if containerID[1] == container.ID {
 					contName = cont.Name
 				}
 			}
@@ -116,11 +116,10 @@ func (e *Exporter) once() {
 	if cardCoreUsage1 >= 0 || cardMemUsage1 >= 0 {
 		e.collector.Card(CardNum1, cardCoreUsage1, cardMemUsage1)
 	}
-
-
 }
 
 func (e *Exporter) Run(stop <-chan struct{}) {
+	go e.ptree.Run(stop)
 	e.watcher.Run(stop)
 	util.Loop(e.once, e.interval, stop)
 }

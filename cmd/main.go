@@ -2,15 +2,20 @@ package main
 
 import (
 	"flag"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/log"
 	"nano-gpu-exporter/pkg/exporter"
 	"nano-gpu-exporter/pkg/util"
+	"net/http"
 	"strings"
 	"time"
 )
 
-const Resources = "nvidia.com/gpu,tke.cloud.tencent.com/qgpu-core,tke.cloud.tencent.com/qgpu-core"
+const Resources = "nvidia.com/gpu,tke.cloud.tencent.com/qgpu-core,tke.cloud.tencent.com/qgpu-memory"
 
 var (
+	addr    = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
 	node      string
 	resources string
 	interval  int
@@ -25,5 +30,13 @@ func init(){
 
 func main() {
 	e := exporter.NewExporter(node, strings.Split(resources, ","), time.Duration(interval) * time.Second)
-	e.Run(util.NeverStop)
+	go e.Run(util.NeverStop)
+
+	http.Handle("/metrics", promhttp.HandlerFor(
+		prometheus.DefaultGatherer,
+		promhttp.HandlerOpts{
+			DisableCompression: true,
+		},
+	))
+	log.Fatal(http.ListenAndServe(*addr, nil))
 }

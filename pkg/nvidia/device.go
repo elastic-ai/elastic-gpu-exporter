@@ -8,7 +8,7 @@ import (
 )
 
 type Device interface {
-	GetDeviceUsage(cardNum int)  map[int]*process.ProcessUsage
+	GetDeviceUsage(cardNum int)  (map[int]*process.ProcessUsage,error)
 }
 
 type DeviceImpl struct {

@@ -95,6 +95,15 @@ func (w *KubeWatcher) Run(stop <-chan struct{}) {
 				klog.Errorf("Cannot convert to *v1.Pod: %t %v", obj, obj)
 				return
 			}
+			if pod.Name == "cuda-10c-594994874f-2g649" {
+				klog.Info("cuda-10c-594994874f-xqcg4--------------")
+				for _, container := range pod.Spec.Containers {
+					for name, _ := range container.Resources.Limits {
+						klog.Info(name)
+					}
+				}
+
+			}
 			if !util.PodHasResource(pod, w.labelSet) {
 				return
 			}
