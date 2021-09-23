@@ -58,6 +58,16 @@ func NewCollector() *Collector {
 	}
 }
 
+func (c *Collector) Register() {
+	prometheus.MustRegister(c.PodMemo)
+	prometheus.MustRegister(c.PodCore)
+	prometheus.MustRegister(c.GPUMemo)
+	prometheus.MustRegister(c.GPUCore)
+	prometheus.MustRegister(c.ContainerCore)
+	prometheus.MustRegister(c.ContainerMemo)
+
+}
+
 func (c *Collector) Card(id string, core, memo float64) {
 	c.GPUCore.WithLabelValues(id).Set(core)
 	c.GPUMemo.WithLabelValues(id).Set(memo)
@@ -70,5 +80,7 @@ func (c *Collector) Pod(namespace, name string, core, memo float64) {
 
 func (c *Collector) Container(namespace, pod, container string, core, memo float64) {
 	c.ContainerCore.WithLabelValues(namespace, pod, container).Set(core)
-	c.ContainerCore.WithLabelValues(namespace, pod, container).Set(memo)
+	c.ContainerMemo.WithLabelValues(namespace, pod, container).Set(memo)
 }
+
+

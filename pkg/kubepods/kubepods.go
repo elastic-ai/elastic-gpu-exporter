@@ -1,8 +1,12 @@
 package kubepods
 
 import (
+	"flag"
 	v12 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	"nano-gpu-exporter/pkg/util"
+	"path/filepath"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -13,8 +17,11 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog"
+)
+
+const(
+	RecommendedKubeConfigPathEnv = "KUBECONFIG"
 )
 
 type Handler struct {
@@ -37,11 +44,34 @@ type KubeWatcher struct {
 }
 
 func NewWatcher(handler *Handler, gpuLabels []string, node string) Watcher {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		klog.Fatalf("create watcher failed: %s", err.Error())
+	var kubeconfig *string
+	if home := homedir.HomeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
-	client := kubernetes.NewForConfigOrDie(config)
+	flag.Parse()
+
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		klog.Fatalf("Could not get config")
+	}
+
+	// create the clientset
+	//clientset, err = kubernetes.NewForConfig(restConfig)
+
+	// Grab a dynamic interface that we can create informers from
+	//dc, err := dynamic.NewForConfig(cfg)
+	//if err != nil {
+	//	logrus.WithError(err).Fatal("could not generate dynamic client for config")
+	//}
+
+
+	//config, err := rest.InClusterConfig()
+	//if err != nil {
+	//	klog.Fatalf("create watcher failed: %s", err.Error())
+	//}
+	client, _ := kubernetes.NewForConfig(config)
 	informersFactory := informers.NewSharedInformerFactoryWithOptions(client, time.Second, informers.WithTweakListOptions(nodeNameFilter(node)))
 	labelSet := make(map[string]struct{})
 	for _, label := range gpuLabels {
@@ -64,6 +94,15 @@ func (w *KubeWatcher) Run(stop <-chan struct{}) {
 			if !ok {
 				klog.Errorf("Cannot convert to *v1.Pod: %t %v", obj, obj)
 				return
+			}
+			if pod.Name == "cuda-10c-594994874f-2g649" {
+				klog.Info("cuda-10c-594994874f-xqcg4--------------")
+				for _, container := range pod.Spec.Containers {
+					for name, _ := range container.Resources.Limits {
+						klog.Info(name)
+					}
+				}
+
 			}
 			if !util.PodHasResource(pod, w.labelSet) {
 				return

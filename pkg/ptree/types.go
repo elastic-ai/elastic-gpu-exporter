@@ -14,6 +14,18 @@ func NewNode() *Node {
 	}
 }
 
+func NewP() *Pod {
+	return &Pod{
+		Containers: make(map[string]*Container),
+	}
+}
+
+func NewC() *Container {
+	return &Container{
+		Processes: make(map[int]*Process),
+	}
+}
+
 func (n *Node) GetProcessByPid(pid int) (p *Process, exist bool) {
 	if process, ok := n.Processes[pid]; ok {
 		return process, true
@@ -80,4 +92,9 @@ func (c *Container) AddProcess(pid int) {
 type Process struct {
 	Pid    int
 	Parent *Container
+}
+
+type ProcessUsage struct {
+	GPUCore float64
+	GPUMemo float64
 }

@@ -1,0 +1,1 @@
+cd /go/src/cmd/ && go run main.go
