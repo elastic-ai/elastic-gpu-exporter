@@ -4,6 +4,7 @@ import (
 	"k8s.io/klog"
 	process "nano-gpu-exporter/pkg/ptree"
 	"time"
+	//"github.com/alex337/go-nvml"
 	"tkestack.io/nvml"
 )
 
@@ -14,7 +15,7 @@ type Device interface {
 type DeviceImpl struct {
 }
 
-func (device *DeviceImpl) GetDeviceUsage(cardNum int)  (map[int]*process.ProcessUsage,error ){
+func (device *DeviceImpl) GetDeviceUsage(cardNum int)  (map[int]*process.ProcessUsage, error ){
 	nvml.Init()
 	defer nvml.Shutdown()
 	dev, _ := nvml.DeviceGetHandleByIndex(uint(cardNum))
@@ -29,7 +30,7 @@ func (device *DeviceImpl) GetDeviceUsage(cardNum int)  (map[int]*process.Process
 		if !exit {
 			usageMap[int(info.Pid)] = new(process.ProcessUsage)
 		}
-		usageMap[int(info.Pid)].GPUMemo = float64(info.UsedGPUMemory >> 20)
+		usageMap[int(info.Pid)].GPUMem = float64(info.UsedGPUMemory >> 20)
 	}
 	processUtilization, err := dev.DeviceGetProcessUtilization(1024, time.Second)
 	if err != nil {
@@ -79,7 +80,7 @@ func (device *DeviceImpl) getPidUsage(pid int) (*process.ProcessUsage, error) {
 			}
 		}
 		return &process.ProcessUsage{
-			GPUMemo:   usedMemory,
+			GPUMem:   usedMemory,
 			GPUCore:   usedCore,
 		}, nil
 	}

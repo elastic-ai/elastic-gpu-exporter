@@ -1,12 +1,9 @@
 package kubepods
 
 import (
-	"flag"
 	v12 "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
+	"k8s.io/client-go/rest"
 	"nano-gpu-exporter/pkg/util"
-	"path/filepath"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -44,19 +41,19 @@ type KubeWatcher struct {
 }
 
 func NewWatcher(handler *Handler, gpuLabels []string, node string) Watcher {
-	var kubeconfig *string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	}
-	flag.Parse()
-
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		klog.Fatalf("Could not get config")
-	}
-
+	//var kubeconfig *string
+	//if home := homedir.HomeDir(); home != "" {
+	//	kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	//} else {
+	//	kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	//}
+	//flag.Parse()
+	//
+	//config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	//if err != nil {
+	//	klog.Fatalf("Could not get config")
+	//}
+    //------------------
 	// create the clientset
 	//clientset, err = kubernetes.NewForConfig(restConfig)
 
@@ -67,10 +64,31 @@ func NewWatcher(handler *Handler, gpuLabels []string, node string) Watcher {
 	//}
 
 
-	//config, err := rest.InClusterConfig()
-	//if err != nil {
-	//	klog.Fatalf("create watcher failed: %s", err.Error())
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		klog.Fatalf("create watcher failed: %s", err.Error())
+	}
+
+	//------------
+	//kubeConfig := ""
+	//if len(os.Getenv(RecommendedKubeConfigPathEnv)) > 0 {
+	//	// use the current context in kubeconfig
+	//	// This is very useful for running locally.
+	//	kubeConfig = os.Getenv(RecommendedKubeConfigPathEnv)
 	//}
+	//
+	//// Get kubernetes config.
+	//restConfig, err := clientcmd.BuildConfigFromFlags("", kubeConfig)
+	//if err != nil {
+	//	klog.Fatalf("Error building kubeconfig: %s", err.Error())
+	//}
+	//
+	//// create the clientset
+	//client, err := kubernetes.NewForConfig(restConfig)
+	//if err != nil {
+	//	klog.Fatalf("Failed to init rest config due to %v", err)
+	//}
+	//--------------
 	client, _ := kubernetes.NewForConfig(config)
 	informersFactory := informers.NewSharedInformerFactoryWithOptions(client, time.Second, informers.WithTweakListOptions(nodeNameFilter(node)))
 	labelSet := make(map[string]struct{})
@@ -94,15 +112,6 @@ func (w *KubeWatcher) Run(stop <-chan struct{}) {
 			if !ok {
 				klog.Errorf("Cannot convert to *v1.Pod: %t %v", obj, obj)
 				return
-			}
-			if pod.Name == "cuda-10c-594994874f-2g649" {
-				klog.Info("cuda-10c-594994874f-xqcg4--------------")
-				for _, container := range pod.Spec.Containers {
-					for name, _ := range container.Resources.Limits {
-						klog.Info(name)
-					}
-				}
-
 			}
 			if !util.PodHasResource(pod, w.labelSet) {
 				return

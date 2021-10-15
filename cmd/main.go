@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const Resources = "nvidia.com/gpu,tke.cloud.tencent.com/qgpu-core,tke.cloud.tencent.com/qgpu-memory"
+const Resources = "nvidia.com/gpu,tke.cloud.tencent.com/qgpu-core,tke.cloud.tencent.com/qgpu-memory,nano-gpu/gpu-percent"
 
 var (
 	addr    = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
@@ -38,5 +38,6 @@ func main() {
 			DisableCompression: true,
 		},
 	))
+	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }

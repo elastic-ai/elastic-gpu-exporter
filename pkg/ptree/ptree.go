@@ -13,6 +13,8 @@ import (
 // PTree is a common interface to detect the tree such as:
 // node -> pods -> containers -> processes
 
+const count int = 0
+
 type PTree interface {
 	Run(stop <-chan struct{})
 	InterestPod(UID, QOS string)
@@ -58,6 +60,9 @@ func (p *PTreeImpl) InterestPod(UID string, QOS string) {
 func (p *PTreeImpl) ForgetPod(UID string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	//for  {
+	//
+	//}
 	delete(p.interestingPods, UID)
 }
 
@@ -86,6 +91,9 @@ func (p *PTreeImpl) nextSnapshot() error {
 			snapshot.addPod(&pod)
 		}
 	}
+	klog.Info("time:",time.Now())
+	klog.Info("nextSnapshot-------",snapshot)
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.nodeSnapshot = snapshot
