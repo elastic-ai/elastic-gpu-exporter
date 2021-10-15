@@ -1,6 +1,11 @@
 package util
 
-import "time"
+import (
+	"fmt"
+	v1 "k8s.io/api/core/v1"
+	"strconv"
+	"time"
+)
 
 var NeverStop = make(chan struct{})
 
@@ -15,3 +20,25 @@ func Loop(f func(), duration time.Duration, stop <-chan struct{}) {
 		}
 	}
 }
+
+func GetGPUCoreFromContainer(container *v1.Container) int {
+	val, ok := container.Resources.Limits[ResourceGPUCore]
+	if !ok {
+		return 0
+	}
+	return int(val.Value())
+}
+
+func GetGPUMemoryFromContainer(container *v1.Container) int {
+	val, ok := container.Resources.Limits[ResourceGPUMemory]
+	if !ok {
+		return 0
+	}
+	return int(val.Value())
+}
+
+func Decimal(value float64) float64 {
+	value, _ = strconv.ParseFloat(fmt.Sprintf("%.2f", value), 64)
+	return value
+}
+

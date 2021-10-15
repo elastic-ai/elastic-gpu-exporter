@@ -96,5 +96,10 @@ type Process struct {
 
 type ProcessUsage struct {
 	GPUCore float64
-	GPUMemo float64
+	GPUMem  float64
+}
+
+type CardUsage struct {
+	Core float64
+	Mem  float64
 }

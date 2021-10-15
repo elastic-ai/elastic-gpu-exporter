@@ -1,23 +1,24 @@
 package exporter
 
 import (
+	"fmt"
 	"k8s.io/klog"
 	"nano-gpu-exporter/pkg/kubepods"
 	"nano-gpu-exporter/pkg/metrics"
 	"nano-gpu-exporter/pkg/nvidia"
 	tree "nano-gpu-exporter/pkg/ptree"
 	"nano-gpu-exporter/pkg/util"
-	"strings"
+	"strconv"
 	"time"
-
+	//"github.com/alex337/go-nvml"
+	"tkestack.io/nvml"
 	v1 "k8s.io/api/core/v1"
 )
 
 const (
-	CardNum0 = "0"
-	CardNum1 = "1"
+	HundredCore = 100
+	GiBToMiB    = 1024
 )
-
 type Exporter struct {
 	node       string
 	gpuLabels  []string
@@ -50,6 +51,7 @@ func NewExporter(node string, gpuLabels []string, interval time.Duration) *Expor
 			},
 			DelFunc: func(pod *v1.Pod) {
 				podCache.DelPod(string(pod.UID))
+				klog.Info("pod",pod.Name)
 				ptree.ForgetPod(string(pod.UID))
 			},
 		}, gpuLabels, node),
@@ -57,64 +59,131 @@ func NewExporter(node string, gpuLabels []string, interval time.Duration) *Expor
 }
 
 func (e *Exporter) once() {
-	processUsage0 := make(map[int]*tree.ProcessUsage)
-	processUsage1 := make(map[int]*tree.ProcessUsage)
+	nvml.Init()
+	defer nvml.Shutdown()
+	cardCount, err := nvml.DeviceGetCount()
+	klog.Info("Exporter run")
+	if err != nil{
+		klog.Error("Cannot get DeviceGetCount by nvml")
+		klog.Info(err)
+	}
 
-	processUsage0, err := e.device.GetDeviceUsage(0)
-	if err != nil{
-		klog.Error("Cannot get processusage in GPU 0")
+	cardUsages := make([]tree.CardUsage, cardCount)
+	processUsages := make([]map[int]*tree.ProcessUsage, cardCount)
+
+	for i := 0; i < int(cardCount); i++ {
+		processUsages[i], err = e.device.GetDeviceUsage(i)
+		if err != nil{
+			klog.Errorf("Cannot get processusage in GPU %d", i)
+		}
 	}
-	processUsage1, err = e.device.GetDeviceUsage(1)
-	if err != nil{
-		klog.Error("Cannot get processusage in GPU 1")
+	klog.Info("e.podCache:",e.podCache)
+	klog.Info("e.ptree.Snapshot():",e.ptree.Snapshot())
+
+	var totalMem uint64
+	for i := 0; i < int(cardCount); i++ {
+		dev, err := nvml.DeviceGetHandleByIndex(uint(i))
+		if err != nil{
+			klog.Error("DeviceGetHandleByIndex", err)
+		}
+		_, _, memTotal, err := dev.DeviceGetMemoryInfo()
+		totalMem += memTotal >> 20
 	}
-	var cardMemUsage0, cardCoreUsage0, cardMemUsage1, cardCoreUsage1 float64
 
 	node := e.ptree.Snapshot()
 	for _, pod := range node.Pods{
-		var podCore, podMem float64
+		var podCore, podMem, podCoreRequest, podMemRequest float64
+
 		p, _ := e.podCache.GetPod(pod.UID)
+		klog.Info("p.Spec.Containers-------:",p.Spec.Containers)
+		for _,cont := range p.Spec.Containers{
+			klog.Info("cont.id",cont.Name)
+		}
+        klog.Info("p.Status.ContainerStatuses-------:",p.Status.ContainerStatuses)
+		containerMap := make(map[string]string)
+		for _, cont := range p.Status.ContainerStatuses{
+			klog.Info("cont.ContainerID",cont.ContainerID)
+			klog.Info("cont.Name",cont.Name)
+
+			containerMap[cont.ContainerID] = cont.Name
+		}
 		ns := p.Namespace
+		klog.Info("containerMap:",containerMap)
 		for _, container := range pod.Containers{
+
+			contName, exist := containerMap[fmt.Sprintf(util.ContainerID,container.ID)]
+			klog.Info("container.parent",container.Parent)
+			if !exist {
+				continue
+			}
 			var contCore, contMem float64
 			for _, proc := range container.Processes{
-				procUsage0, exist := processUsage0[proc.Pid]
-				if exist {
-					contMem  += procUsage0.GPUMemo
-					contCore += procUsage0.GPUCore
-					cardMemUsage0  += procUsage0.GPUMemo
-					cardCoreUsage0 += procUsage0.GPUCore
-				}
-
-				procUsage1, exist := processUsage1[proc.Pid]
-				if exist {
-					contMem  += procUsage1.GPUMemo
-					contCore += procUsage1.GPUCore
-					cardMemUsage1  += procUsage1.GPUMemo
-					cardCoreUsage1 += procUsage1.GPUCore
+				for i := 0; i < int(cardCount); i++ {
+					procUsage, exist := processUsages[i][proc.Pid]
+					if exist {
+						contMem  += procUsage.GPUMem
+						contCore += procUsage.GPUCore
+						//klog.Info("contCore----------------:", contCore)
+						cardUsages[i].Mem  += procUsage.GPUMem
+						cardUsages[i].Core += procUsage.GPUCore
+					}
 				}
 			}
-
+			//contMem /= float64(1024)
 			podCore += contCore
 			podMem += contMem
-			var contName string
-			for _, cont := range p.Status.ContainerStatuses {
-				containerID := strings.Split(cont.ContainerID,"//")
-				if containerID[1] == container.ID {
-					contName = cont.Name
+			var memRequest, coreRequest float64
+			for _,cont := range p.Spec.Containers{
+				if contName == cont.Name {
+					memRequest = float64(util.GetGPUMemoryFromContainer(&cont))
+					coreRequest = float64(util.GetGPUCoreFromContainer(&cont))
 				}
 			}
-			e.collector.Container(ns, pod.UID, contName, contCore, contMem)
+			podCoreRequest += coreRequest
+			podMemRequest += memRequest
+
+			var contCoreUtil float64
+			var contMemUtil float64
+			if contCore != 0 && coreRequest != 0{
+				contCoreUtil = contCore / coreRequest
+			}
+			if contMem != 0 && memRequest != 0{
+				contMemUtil = (contMem / GiBToMiB) / memRequest
+			}
+			klog.Info("contMem:",contMem)
+			klog.Info("memRequest:",memRequest)
+			klog.Info("contCore:",contCore)
+			klog.Info("coreRequest:",coreRequest)
+
+			e.collector.Container(e.node, ns, pod.UID, contName, contCore, contMem, util.Decimal(contCoreUtil * 100), util.Decimal(contMemUtil * 100))
 		}
-		e.collector.Pod(ns, pod.UID, podCore, podMem)
-	}
+		var podMemUtil, podCoreUtil float64
+		if podMemRequest != 0 && podMem != 0 {
+			podMemUtil = (podMem / GiBToMiB) / podMemRequest
+		}
+		if podCoreRequest != 0 && podCore != 0 {
+			podCoreUtil = podCore / podCoreRequest
+		}
 
-	if cardCoreUsage0 >= 0 || cardMemUsage0 >= 0 {
-		e.collector.Card(CardNum0, cardCoreUsage0, cardMemUsage0)
+		e.collector.Pod(e.node, ns, pod.UID, podCore, podMem, util.Decimal(podCoreUtil * 100), util.Decimal(podMemUtil * 100), podMemRequest * GiBToMiB, util.Decimal(podCore / float64(cardCount * HundredCore) * 100), util.Decimal(podMem / float64(totalMem) * 100))
 	}
+	for i := 0; i < int(cardCount); i++ {
+		dev, err := nvml.DeviceGetHandleByIndex(uint(i))
+		_, memUsed, memTotal, err := dev.DeviceGetMemoryInfo()
+		//util1, _ := dev.DeviceGetAverageGPUUsage(time.Second)
+		//klog.Info("util1----------",util1)
 
-	if cardCoreUsage1 >= 0 || cardMemUsage1 >= 0 {
-		e.collector.Card(CardNum1, cardCoreUsage1, cardMemUsage1)
+
+		utilization, err := dev.DeviceGetUtilizationRates()
+		//klog.Info("util:",utilization.GPU)
+
+		if err != nil {
+			klog.Error("DeviceGetMemoryInfo", err)
+		}
+
+		if cardUsages[i].Mem >= 0 || cardUsages[i].Core >= 0 {
+			e.collector.Card(e.node, strconv.Itoa(i), cardUsages[i].Core, float64(memUsed >> 20), util.Decimal(float64(utilization.GPU )), util.Decimal(float64(memUsed >> 20) / float64(memTotal >> 20) * 100))
+		}
 	}
 }
 

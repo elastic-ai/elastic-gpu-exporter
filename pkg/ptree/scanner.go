@@ -14,9 +14,9 @@ const(
 	QOSGuaranteed = "guaranteed"
 	QOSBurstable  = "burstable"
 	QOSBestEffort = "besteffort"
-	CgroupBase    = "/sys/fs/cgroup/memory"
+	CgroupBase    = "/host/sys/fs/cgroup/memory"
 	PodPrefix     = "pod"
-	CGROUP_PROCS  = "cgroup.procs"
+	CgroupProcs   = "cgroup.procs"
 	kubeRoot      = "kubepods"
 )
 
@@ -95,11 +95,13 @@ func (scan *ScannerImpl) transformToPath(cgroupName CgroupName) string {
 
 func (scan *ScannerImpl)readContainerFile(podPath string, pod *Pod) (map[string]*Container, error) {
 	fileList, err := ioutil.ReadDir(podPath)
+	klog.Info("podpath-------",podPath)
 	if err != nil {
 		klog.Errorf("Can't read %s, %v", podPath, err)
 		return nil, err
 	}
 	for _,file :=range fileList {
+		klog.Info("file-----------:",file)
 		containerId := file.Name()
 		if IsContainerID(containerId) {
 			scan.pod.AddContainer(containerId)
@@ -107,7 +109,7 @@ func (scan *ScannerImpl)readContainerFile(podPath string, pod *Pod) (map[string]
 				ID: containerId,
 				Parent: pod,
 			}
-			procPath := filepath.Join(podPath, containerId, CGROUP_PROCS)
+			procPath := filepath.Join(podPath, containerId, CgroupProcs)
 			process, err := scan.readPidFile(procPath, scan.pod.Containers[containerId])
 			if err != nil {
 				klog.Errorf("Cannot read the pid in the container: %s, %v", containerId, err)
