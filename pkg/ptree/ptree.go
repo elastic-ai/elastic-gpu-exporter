@@ -2,7 +2,7 @@ package ptree
 
 import (
 	"fmt"
-	"nano-gpu-exporter/pkg/util"
+	"elastic-gpu-exporter/pkg/util"
 	"strings"
 	"sync"
 	"time"

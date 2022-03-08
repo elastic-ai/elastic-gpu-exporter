@@ -1,4 +1,4 @@
-module nano-gpu-exporter
+module elasticgpu.io/elastic-gpu-exporter
 
 go 1.16
 
@@ -16,5 +16,4 @@ require (
 	k8s.io/kubectl v0.17.4
 	//github.com/alex337/go-nvml v1.0.0
 	tkestack.io/nvml v0.0.0-00010101000000-000000000000
-
 )

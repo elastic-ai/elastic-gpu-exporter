@@ -5,14 +5,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
-	"nano-gpu-exporter/pkg/exporter"
-	"nano-gpu-exporter/pkg/util"
+	"elasticgpu.io/elastic-gpu-exporter/pkg/exporter"
+	"elasticgpu.io/elastic-gpu-exporter/pkg/util"
 	"net/http"
 	"strings"
 	"time"
 )
 
-const Resources = "nvidia.com/gpu,tke.cloud.tencent.com/qgpu-core,tke.cloud.tencent.com/qgpu-memory,nano-gpu/gpu-percent"
+const Resources = "nvidia.com/gpu,tke.cloud.tencent.com/qgpu-core,tke.cloud.tencent.com/qgpu-memory,elastic-gpu/gpu-percent"
 
 var (
 	addr    = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")

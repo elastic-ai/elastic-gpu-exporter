@@ -3,7 +3,7 @@ package kubepods
 import (
 	v12 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
-	"nano-gpu-exporter/pkg/util"
+	"elastic-gpu-exporter/pkg/util"
 	"time"
 
 	v1 "k8s.io/api/core/v1"

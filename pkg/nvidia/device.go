@@ -2,7 +2,7 @@ package nvidia
 
 import (
 	"k8s.io/klog"
-	process "nano-gpu-exporter/pkg/ptree"
+	process "elastic-gpu-exporter/pkg/ptree"
 	"time"
 	//"github.com/alex337/go-nvml"
 	"tkestack.io/nvml"
